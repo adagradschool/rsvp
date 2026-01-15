@@ -20,6 +20,9 @@ const urlInput = document.querySelector("#urlInput");
 const summarizeUrlBtn = document.querySelector("#summarizeUrl");
 const summaryStatus = document.querySelector("#summaryStatus");
 const toast = document.querySelector("#toast");
+const gutenbergStatus = document.querySelector("#gutenbergStatus");
+const gutenbergList = document.querySelector("#gutenbergList");
+const gutenbergLoadMore = document.querySelector("#gutenbergLoadMore");
 
 let words = [];
 let index = 0;
@@ -28,6 +31,8 @@ let timer = null;
 let msPerWord = 0;
 let toastTimer = null;
 let controlsTimer = null;
+let gutenbergNextUrl = "https://gutendex.com/books/";
+let gutenbergLoading = false;
 
 const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
@@ -37,6 +42,11 @@ const formatTime = (seconds) => {
 
 const setStatus = (message) => {
   summaryStatus.textContent = message;
+};
+
+const setGutenbergStatus = (message) => {
+  if (!gutenbergStatus) return;
+  gutenbergStatus.textContent = message;
 };
 
 const clampWpm = (value) => {
@@ -90,6 +100,18 @@ const computeOrpIndex = (word) => {
 };
 
 const stripWord = (word) => word.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "");
+
+const parseWords = (text) => {
+  const wordsList = [];
+  const ranges = [];
+  const regex = /\S+/g;
+  let match;
+  while ((match = regex.exec(text))) {
+    wordsList.push(match[0]);
+    ranges.push([match.index, match.index + match[0].length]);
+  }
+  return { words: wordsList, ranges };
+};
 
 const getDelayMultiplier = (word) => {
   if (/[.?!]$/.test(word)) return 1.6;
@@ -233,8 +255,8 @@ const toggleFullscreen = async () => {
 };
 
 const loadWords = () => {
-  const raw = textInput.value.trim();
-  words = raw ? raw.split(/\s+/) : [];
+  const { words: parsedWords } = parseWords(textInput.value);
+  words = parsedWords;
   index = 0;
   updateProgress();
   if (words.length) {
@@ -242,6 +264,229 @@ const loadWords = () => {
   } else {
     wordDisplay.textContent = "Ready";
     wordDisplay.classList.add("show");
+  }
+};
+
+const syncReaderToCaret = () => {
+  const { words: parsedWords, ranges } = parseWords(textInput.value);
+  words = parsedWords;
+  if (playing) {
+    playing = false;
+    playPause.textContent = "Play";
+    clearTimeout(timer);
+  }
+
+  if (!words.length) {
+    index = 0;
+    wordDisplay.textContent = "Ready";
+    wordDisplay.classList.add("show");
+    updateProgress();
+    return;
+  }
+
+  const caret = Number.isFinite(textInput.selectionStart) ? textInput.selectionStart : 0;
+  let nextIndex = 0;
+  for (let i = 0; i < ranges.length; i += 1) {
+    const [start, end] = ranges[i];
+    if (caret <= start) {
+      nextIndex = Math.max(i - 1, 0);
+      break;
+    }
+    if (caret <= end) {
+      nextIndex = i;
+      break;
+    }
+    nextIndex = i;
+  }
+  index = Math.min(Math.max(nextIndex, 0), Math.max(words.length - 1, 0));
+  setWord(words[index]);
+  updateProgress();
+};
+
+const getPlainTextFormat = (formats = {}) => {
+  const entries = Object.entries(formats);
+  for (const [format, url] of entries) {
+    if (format.startsWith("text/plain") && !/\.zip$/i.test(url)) {
+      return url;
+    }
+  }
+  return null;
+};
+
+const stripGutenbergText = (text) => {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const startRegex = /\*\*\* START OF (?:THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?\*\*\*/i;
+  const endRegex = /\*\*\* END OF (?:THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*?\*\*\*/i;
+  let trimmed = normalized;
+  const startMatch = trimmed.match(startRegex);
+  if (startMatch) {
+    trimmed = trimmed.slice(startMatch.index + startMatch[0].length);
+  }
+  const endMatch = trimmed.match(endRegex);
+  if (endMatch) {
+    trimmed = trimmed.slice(0, endMatch.index);
+  }
+  return trimmed.trim();
+};
+
+const setReaderText = (text) => {
+  textInput.value = text;
+  playing = false;
+  playPause.textContent = "Play";
+  clearTimeout(timer);
+  loadWords();
+};
+
+const renderGutenbergBooks = (books, append) => {
+  if (!append) {
+    gutenbergList.innerHTML = "";
+  }
+
+  if (!books.length && !append) {
+    const empty = document.createElement("div");
+    empty.className = "gutenberg-card";
+    empty.textContent = "No books found.";
+    gutenbergList.appendChild(empty);
+    return;
+  }
+
+  books.forEach((book) => {
+    const card = document.createElement("div");
+    card.className = "gutenberg-card";
+
+    const title = document.createElement("div");
+    title.className = "gutenberg-title";
+    title.textContent = book.title || "Untitled";
+
+    const meta = document.createElement("div");
+    meta.className = "gutenberg-meta";
+    const authorList = (book.authors || []).map((author) => author.name).slice(0, 2).join(", ");
+    if (authorList) {
+      const author = document.createElement("span");
+      author.textContent = authorList;
+      meta.appendChild(author);
+    }
+    if (book.download_count) {
+      const downloads = document.createElement("span");
+      downloads.textContent = `${book.download_count.toLocaleString()} downloads`;
+      meta.appendChild(downloads);
+    }
+    if (book.languages && book.languages.length) {
+      const language = document.createElement("span");
+      language.textContent = book.languages.join(", ").toUpperCase();
+      meta.appendChild(language);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "gutenberg-actions";
+    const readButton = document.createElement("button");
+    readButton.type = "button";
+    readButton.textContent = "Read";
+    readButton.addEventListener("click", () => loadGutenbergBook(book, readButton));
+    actions.appendChild(readButton);
+
+    card.appendChild(title);
+    if (meta.children.length) {
+      card.appendChild(meta);
+    }
+    card.appendChild(actions);
+    gutenbergList.appendChild(card);
+  });
+};
+
+const updateGutenbergLoadMore = () => {
+  if (!gutenbergLoadMore) return;
+  if (!gutenbergNextUrl) {
+    gutenbergLoadMore.setAttribute("hidden", "true");
+    return;
+  }
+  gutenbergLoadMore.removeAttribute("hidden");
+  gutenbergLoadMore.disabled = gutenbergLoading;
+};
+
+const loadGutenbergBooks = async ({ reset = false } = {}) => {
+  if (!gutenbergList || gutenbergLoading || !gutenbergNextUrl) return;
+  gutenbergLoading = true;
+  updateGutenbergLoadMore();
+  setGutenbergStatus("Loading books...");
+  try {
+    const response = await fetch(gutenbergNextUrl);
+    if (!response.ok) {
+      throw new Error("Failed to load books.");
+    }
+    const data = await response.json();
+    gutenbergNextUrl = data.next;
+    renderGutenbergBooks(data.results || [], !reset);
+    setGutenbergStatus("Select a book to load it into the reader.");
+  } catch (error) {
+    setGutenbergStatus(error.message);
+  } finally {
+    gutenbergLoading = false;
+    updateGutenbergLoadMore();
+  }
+};
+
+const loadGutenbergBook = async (book, button) => {
+  const formatUrl = getPlainTextFormat(book.formats);
+  if (!formatUrl) {
+    setGutenbergStatus("No plain text format available for that book.");
+    return;
+  }
+
+  const safeUrl = formatUrl.replace(/^http:\/\//, "https://");
+  const gutenbergPath =
+    document.body.dataset.summarize === "cli"
+      ? "/gutenberg"
+      : document.body.dataset.summarize === "api"
+        ? "/api/gutenberg"
+        : window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+          ? "/gutenberg"
+          : "/api/gutenberg";
+  const proxyUrl = `${gutenbergPath}?url=${encodeURIComponent(safeUrl)}`;
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Loading";
+  setGutenbergStatus(`Loading "${book.title}"...`);
+
+  try {
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error("Failed to fetch book text.");
+    }
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let rawText = "";
+    let lastFlush = 0;
+
+    if (reader) {
+      setGutenbergStatus(`Streaming "${book.title}"...`);
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        rawText += decoder.decode(value, { stream: true });
+        const now = Date.now();
+        if (now - lastFlush > 200) {
+          textInput.value = rawText;
+          lastFlush = now;
+        }
+      }
+      rawText += decoder.decode();
+    } else {
+      rawText = await response.text();
+    }
+
+    const cleaned = stripGutenbergText(rawText);
+    if (!cleaned) {
+      throw new Error("Book text is empty.");
+    }
+    setReaderText(cleaned);
+    showToast("Book loaded");
+    setGutenbergStatus(`Loaded "${book.title}".`);
+  } catch (error) {
+    setGutenbergStatus(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
   }
 };
 
@@ -256,6 +501,13 @@ fontSizeInput.addEventListener("input", (event) => {
   if (words.length) {
     setWord(words[index]);
   }
+});
+
+textInput.addEventListener("input", syncReaderToCaret);
+textInput.addEventListener("click", syncReaderToCaret);
+document.addEventListener("selectionchange", () => {
+  if (document.activeElement !== textInput) return;
+  syncReaderToCaret();
 });
 
 playPause.addEventListener("click", togglePlayback);
@@ -423,3 +675,10 @@ const urlFromQuery = new URLSearchParams(window.location.search).get("url");
 if (urlFromQuery) {
   urlInput.value = urlFromQuery;
 }
+
+if (gutenbergLoadMore) {
+  gutenbergLoadMore.addEventListener("click", () => loadGutenbergBooks({ reset: false }));
+}
+
+updateGutenbergLoadMore();
+loadGutenbergBooks({ reset: true });
