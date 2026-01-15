@@ -37,6 +37,11 @@ export OPENAI_API_KEY=your_key
 
 Then paste a URL and click **Summarize URL**.
 
+### Vercel
+
+The deployed app uses a serverless function at `/api/summarize` (with a `/summarize` rewrite).
+Set `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`) in Vercel env vars.
+
 ## WPM configuration
 
 - Use the slider (saved to localStorage).

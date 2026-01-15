@@ -83,7 +83,7 @@ const serveFile = (filePath, res) => {
 };
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === "POST" && req.url === "/summarize") {
+  if (req.method === "POST" && (req.url === "/summarize" || req.url === "/api/summarize")) {
     try {
       const body = await readBody(req);
       const { url } = JSON.parse(body || "{}");

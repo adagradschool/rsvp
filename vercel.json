@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/summarize", "destination": "/api/summarize" }
+  ]
+}
