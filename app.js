@@ -86,13 +86,7 @@ const adjustWpm = (delta) => {
 };
 
 const computeOrpIndex = (word) => {
-  const length = word.length;
-  if (length <= 1) return 0;
-  if (length <= 5) return 1;
-  if (length <= 9) return 2;
-  if (length <= 13) return 3;
-  if (length <= 17) return 4;
-  return 5;
+  return word.length < 2 ? 0 : 1;
 };
 
 const stripWord = (word) => word.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "");
