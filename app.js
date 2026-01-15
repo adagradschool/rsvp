@@ -48,8 +48,6 @@ const clampWpm = (value) => {
 const getInitialWpm = () => {
   const urlValue = clampWpm(Number(new URLSearchParams(window.location.search).get("wpm")));
   if (urlValue) return urlValue;
-  const stored = clampWpm(Number(localStorage.getItem("rsvpWpm")));
-  if (stored) return stored;
   return 300;
 };
 
@@ -267,9 +265,15 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     togglePlayback();
   }
-  if (getFullscreenElement() && event.shiftKey && (event.key === ">" || event.key === "<")) {
+  if (event.key === "<" || event.key === ">") {
     event.preventDefault();
     adjustWpm(event.key === ">" ? 10 : -10);
+  }
+  const isShiftComma = event.shiftKey && event.code === "Comma";
+  const isShiftPeriod = event.shiftKey && event.code === "Period";
+  if (getFullscreenElement() && (isShiftComma || isShiftPeriod)) {
+    event.preventDefault();
+    adjustWpm(isShiftPeriod ? 10 : -10);
   }
   if (event.key === "f" || event.key === "F") {
     toggleFullscreen();
@@ -305,13 +309,27 @@ window.addEventListener("resize", () => {
   }
 });
 
+const resetWpm = () => {
+  const initialWpm = getInitialWpm();
+  wpmInput.value = initialWpm.toString();
+  wpmInput.defaultValue = initialWpm.toString();
+  applyWpm(initialWpm);
+  updateTimes();
+};
+
+resetWpm();
 loadWords();
-const initialWpm = getInitialWpm();
-wpmInput.value = initialWpm.toString();
-applyWpm(initialWpm);
 wordDisplay.style.fontSize = `${fontSizeInput.value}px`;
-updateTimes();
 updateFullscreenLabel();
+
+window.addEventListener("pageshow", () => {
+  resetWpm();
+  setTimeout(resetWpm, 0);
+});
+
+window.addEventListener("load", () => {
+  setTimeout(resetWpm, 0);
+});
 
 const fullscreenAvailable = Boolean(
   document.documentElement.requestFullscreen ||

@@ -320,6 +320,25 @@ button.ghost {
   text-transform: uppercase;
 }
 
+.footnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.brand-sub a,
+.footnote a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.brand-sub a:hover,
+.footnote a:hover {
+  border-bottom-color: var(--accent);
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
