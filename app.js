@@ -27,6 +27,7 @@ let playing = false;
 let timer = null;
 let msPerWord = 0;
 let toastTimer = null;
+let controlsTimer = null;
 
 const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
@@ -66,13 +67,20 @@ const showToast = (message) => {
   }, 900);
 };
 
+const showControls = () => {
+  document.body.classList.add("show-controls");
+  clearTimeout(controlsTimer);
+  controlsTimer = setTimeout(() => {
+    document.body.classList.remove("show-controls");
+  }, 2500);
+};
+
 const adjustWpm = (delta) => {
   const current = Number(wpmInput.value);
   const next = clampWpm(current + delta);
   if (!next || next === current) return;
   wpmInput.value = next.toString();
   applyWpm(next);
-  localStorage.setItem("rsvpWpm", next.toString());
   updateTimes();
   showToast(`${next} wpm`);
 };
@@ -202,12 +210,28 @@ const exitFullscreen = () => {
   return exit.call(document);
 };
 
+const lockLandscape = async () => {
+  if (!screen.orientation || !screen.orientation.lock) return;
+  try {
+    await screen.orientation.lock("landscape");
+  } catch (error) {
+    setStatus(error.message);
+  }
+};
+
+const unlockOrientation = () => {
+  if (!screen.orientation || !screen.orientation.unlock) return;
+  screen.orientation.unlock();
+};
+
 const toggleFullscreen = async () => {
   try {
     if (getFullscreenElement()) {
       await exitFullscreen();
+      unlockOrientation();
     } else {
       await requestFullscreen();
+      await lockLandscape();
     }
   } catch (error) {
     setStatus(error.message);
@@ -230,7 +254,6 @@ const loadWords = () => {
 wpmInput.addEventListener("input", (event) => {
   const value = Number(event.target.value);
   applyWpm(value);
-  localStorage.setItem("rsvpWpm", value.toString());
   updateTimes();
 });
 
@@ -296,6 +319,15 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+let lastTap = 0;
+viewer.addEventListener("touchend", () => {
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    showControls();
+  }
+  lastTap = now;
+});
+
 const updateFullscreenLabel = () => {
   fullscreenBtn.textContent = getFullscreenElement() ? "Exit full" : "Fullscreen";
 };
@@ -353,7 +385,16 @@ const summarizeUrl = async () => {
   summarizeUrlBtn.textContent = "Working";
 
   try {
-    const response = await fetch("/summarize", {
+    const summarizeMode = document.body.dataset.summarize;
+    const summarizePath =
+      summarizeMode === "cli"
+        ? "/summarize"
+        : summarizeMode === "api"
+          ? "/api/summarize"
+          : window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+            ? "/summarize"
+            : "/api/summarize";
+    const response = await fetch(summarizePath, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),

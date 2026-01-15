@@ -357,4 +357,17 @@ button.ghost {
   .player input[type="range"] {
     width: 100%;
   }
+
+  .viewer-panel .player,
+  .viewer-panel .hint {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  body.show-controls .viewer-panel .player,
+  body.show-controls .viewer-panel .hint {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
