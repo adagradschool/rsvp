@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RSVP Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <p class="brand-title">RSVP Reader</p>
+            <p class="brand-sub">Rapid serial visual presentation at 300 wpm</p>
+          </div>
+        </div>
+        <div class="stat">
+          <span class="label">WPM</span>
+          <span id="wpmReadout">300</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel input-panel">
+          <h2>Paste text</h2>
+          <div class="url-row">
+            <input id="urlInput" type="url" placeholder="https://example.com/article" />
+            <button id="summarizeUrl">Summarize URL</button>
+          </div>
+          <p id="summaryStatus" class="status" aria-live="polite"></p>
+          <textarea id="textInput" spellcheck="false">
+Rapid serial visual presentation (RSVP) is a scientific method for studying the timing of vision. In RSVP, a sequence of stimuli is shown to an observer at one location in their visual field. The observer is instructed to report one of these stimuli - the target - which has a feature that differentiates it from the rest of the stream.
+          </textarea>
+          <div class="controls">
+            <label class="control">
+              <span>Speed</span>
+              <input id="wpm" type="range" min="120" max="800" value="300" />
+            </label>
+            <label class="control">
+              <span>Font size</span>
+              <input id="fontSize" type="range" min="44" max="120" value="86" />
+            </label>
+            <button id="loadText" class="ghost">Load text</button>
+          </div>
+        </section>
+
+        <section class="panel viewer-panel">
+          <div class="viewer">
+            <div class="crosshair horizontal"></div>
+            <div class="crosshair vertical"></div>
+            <div id="wordDisplay" class="word">Ready</div>
+            <div id="measure" class="measure" aria-hidden="true">
+              <span id="measureLead"></span><span id="measureOrp"></span><span id="measureTail"></span>
+            </div>
+            <div id="toast" class="toast" role="status" aria-live="polite"></div>
+          </div>
+          <div class="player">
+            <button id="playPause" class="play">Play</button>
+            <button id="rewind" class="ghost">Back 10</button>
+            <button id="forward" class="ghost">Forward 10</button>
+            <button id="fullscreen" class="ghost">Fullscreen</button>
+            <input id="progress" type="range" min="0" max="0" value="0" />
+            <div class="time">
+              <span id="currentTime">0:00</span>
+              <span class="divider">/</span>
+              <span id="totalTime">0:00</span>
+            </div>
+          </div>
+          <p class="hint">Space: play/pause. Arrow keys: step. F: fullscreen. Esc: reset.</p>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
